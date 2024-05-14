@@ -1,20 +1,40 @@
 mod decode;
 mod encode;
 
-use std::{
-    collections::BTreeMap,
-    ops::{Deref, DerefMut},
-};
-
+use bytes::BytesMut;
 use enum_dispatch::enum_dispatch;
+use std::collections::BTreeMap;
+use std::ops::{Deref, DerefMut};
+use thiserror::Error;
 
 #[enum_dispatch]
 pub trait RespEncode {
     fn encode(self) -> Vec<u8>;
 }
 
-pub trait RespDecode {
-    fn decode(self) -> Result<RespFrame, String>;
+pub trait RespDecode: Sized {
+    const PREFIX: &'static str;
+    fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
+}
+
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum RespError {
+    #[error("Invalid frame: {0}")]
+    InvalidFrame(String),
+    #[error("Invalid frame type: {0}")]
+    InvalidFrameType(String),
+    #[error("Invalid frame length： {0}")]
+    InvalidFrameLength(isize),
+    #[error("Frame is not complete")]
+    NotComplete,
+
+    #[error("Parse error: {0}")]
+    ParseIntError(#[from] std::num::ParseIntError),
+    #[error("Utf8 error: {0}")]
+    Utf8Error(#[from] std::str::Utf8Error),
+    #[error("Parse float error: {0}")]
+    ParseFloatError(#[from] std::num::ParseFloatError),
 }
 
 #[enum_dispatch(RespEncode)]
@@ -45,7 +65,7 @@ pub struct SimpleError(String);
 pub struct BulkString(Vec<u8>);
 
 #[derive(Debug, PartialEq, Eq, PartialOrd)]
-pub struct RespNullBulkString;
+pub struct RespNull;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct RespArray(Vec<RespFrame>);
@@ -54,7 +74,7 @@ pub struct RespArray(Vec<RespFrame>);
 pub struct RespNullArray;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd)]
-pub struct RespNull;
+pub struct RespNullBulkString;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct RespMap(BTreeMap<String, RespFrame>);
@@ -158,123 +178,50 @@ impl RespSet {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::RespFrame;
-
-    use super::*;
-
-    #[test]
-    fn test_simple_string_encode() {
-        let frame: RespFrame = SimpleString::new("OK".to_string()).into();
-
-        assert_eq!(frame.encode(), b"+OK\r\n");
+impl From<&str> for SimpleString {
+    fn from(value: &str) -> Self {
+        SimpleString(value.to_string())
     }
+}
 
-    #[test]
-    fn test_error_encode() {
-        let frame: RespFrame = SimpleError::new("Error message".to_string()).into();
-
-        assert_eq!(frame.encode(), b"-Error message\r\n");
+impl From<&str> for RespFrame {
+    fn from(s: &str) -> Self {
+        SimpleString(s.to_string()).into()
     }
+}
 
-    #[test]
-    fn test_integer_encode() {
-        let frame: RespFrame = 123.into();
-        assert_eq!(frame.encode(), b":+123\r\n");
-
-        let frame: RespFrame = (-123).into();
-        assert_eq!(frame.encode(), b":-123\r\n");
+impl From<&str> for SimpleError {
+    fn from(value: &str) -> Self {
+        SimpleError(value.to_string())
     }
+}
 
-    #[test]
-    fn test_bulk_string_encode() {
-        let frame: RespFrame = BulkString::new(b"hello".to_vec()).into();
-        assert_eq!(frame.encode(), b"$5\r\nhello\r\n");
+impl From<&str> for BulkString {
+    fn from(value: &str) -> Self {
+        BulkString(value.as_bytes().to_vec())
     }
+}
 
-    #[test]
-    fn test_null_bulk_string_encode() {
-        let frame: RespFrame = RespNullBulkString.into();
-        assert_eq!(frame.encode(), b"$-1\r\n");
+impl From<&[u8]> for BulkString {
+    fn from(value: &[u8]) -> Self {
+        BulkString(value.to_vec())
     }
+}
 
-    #[test]
-    fn test_array_encode() {
-        let frame: RespFrame = RespArray::new(vec![
-            BulkString::new("set".to_string()).into(),
-            BulkString::new("hello".to_string()).into(),
-            BulkString::new("world".to_string()).into(),
-        ])
-        .into();
-        assert_eq!(
-            &frame.encode(),
-            b"*3\r\n$3\r\nset\r\n$5\r\nhello\r\n$5\r\nworld\r\n"
-        );
+impl From<&[u8]> for RespFrame {
+    fn from(s: &[u8]) -> Self {
+        BulkString(s.to_vec()).into()
     }
+}
 
-    #[test]
-    fn test_null_array_encode() {
-        let frame: RespFrame = RespNullArray.into();
-        assert_eq!(frame.encode(), b"*-1\r\n");
+impl<const N: usize> From<&[u8; N]> for BulkString {
+    fn from(s: &[u8; N]) -> Self {
+        BulkString(s.to_vec())
     }
+}
 
-    #[test]
-    fn test_null_encode() {
-        let frame: RespFrame = RespNull.into();
-        assert_eq!(frame.encode(), b"_\r\n");
-    }
-
-    #[test]
-    fn test_boolean_encode() {
-        let frame: RespFrame = true.into();
-        assert_eq!(frame.encode(), b"#t\r\n");
-
-        let frame: RespFrame = false.into();
-        assert_eq!(frame.encode(), b"#f\r\n");
-    }
-
-    #[test]
-    fn test_double_encode() {
-        let frame: RespFrame = 123.456.into();
-        assert_eq!(frame.encode(), b",+123.456\r\n");
-
-        let frame: RespFrame = (-123.456).into();
-        assert_eq!(frame.encode(), b",-123.456\r\n");
-
-        let frame: RespFrame = 1.23456e+8.into();
-        assert_eq!(frame.encode(), b",+1.23456e8\r\n");
-
-        let frame: RespFrame = (-1.23456e-9).into();
-        assert_eq!(&frame.encode(), b",-1.23456e-9\r\n");
-    }
-
-    #[test]
-    fn test_map_encode() {
-        let mut map = RespMap::new();
-        map.insert(
-            "hello".to_string(),
-            BulkString::new("world".to_string()).into(),
-        );
-        map.insert("foo".to_string(), (-123456.789).into());
-
-        let frame: RespFrame = map.into();
-        assert_eq!(
-            &frame.encode(),
-            b"%2\r\n+foo\r\n,-123456.789\r\n+hello\r\n$5\r\nworld\r\n"
-        );
-    }
-
-    #[test]
-    fn test_set_encode() {
-        let frame: RespFrame = RespSet::new([
-            RespArray::new([1234.into(), true.into()]).into(),
-            BulkString::new("world".to_string()).into(),
-        ])
-        .into();
-        assert_eq!(
-            frame.encode(),
-            b"~2\r\n*2\r\n:+1234\r\n#t\r\n$5\r\nworld\r\n"
-        );
+impl<const N: usize> From<&[u8; N]> for RespFrame {
+    fn from(s: &[u8; N]) -> Self {
+        BulkString(s.to_vec()).into()
     }
 }
