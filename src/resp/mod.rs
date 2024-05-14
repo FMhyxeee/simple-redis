@@ -24,7 +24,7 @@ pub enum RespError {
     InvalidFrame(String),
     #[error("Invalid frame type: {0}")]
     InvalidFrameType(String),
-    #[error("Invalid frame length： {0}")]
+    #[error("Invalid frame length: {0}")]
     InvalidFrameLength(isize),
     #[error("Frame is not complete")]
     NotComplete,
@@ -38,7 +38,7 @@ pub enum RespError {
 }
 
 #[enum_dispatch(RespEncode)]
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum RespFrame {
     SimpleString(SimpleString),
     Error(SimpleError),
@@ -55,32 +55,32 @@ pub enum RespFrame {
     Set(RespSet),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd)]
-pub struct SimpleString(String);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+pub struct SimpleString(pub(crate) String);
 
-#[derive(Debug, PartialEq, Eq, PartialOrd)]
-pub struct SimpleError(String);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+pub struct SimpleError(pub(crate) String);
 
-#[derive(Debug, PartialEq, Eq, PartialOrd)]
-pub struct BulkString(Vec<u8>);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+pub struct BulkString(pub(crate) Vec<u8>);
 
-#[derive(Debug, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNull;
 
-#[derive(Debug, PartialEq, PartialOrd)]
-pub struct RespArray(Vec<RespFrame>);
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct RespArray(pub(crate) Vec<RespFrame>);
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNullArray;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNullBulkString;
 
-#[derive(Debug, PartialEq, PartialOrd)]
-pub struct RespMap(BTreeMap<String, RespFrame>);
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct RespMap(pub(crate) BTreeMap<String, RespFrame>);
 
-#[derive(Debug, PartialEq, PartialOrd)]
-pub struct RespSet(Vec<RespFrame>);
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct RespSet(pub(crate) Vec<RespFrame>);
 
 impl Deref for SimpleString {
     type Target = String;
@@ -223,5 +223,17 @@ impl<const N: usize> From<&[u8; N]> for BulkString {
 impl<const N: usize> From<&[u8; N]> for RespFrame {
     fn from(s: &[u8; N]) -> Self {
         BulkString(s.to_vec()).into()
+    }
+}
+
+impl AsRef<str> for SimpleString {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for BulkString {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
