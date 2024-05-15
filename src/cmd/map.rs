@@ -1,18 +1,11 @@
+use super::{extract_args, validate_command, CommandExecutor, Set, RESP_OK};
 use crate::{
-    cmd::{CommandExecutor, Get, Ping},
-    Backend, RespArray, RespFrame, RespNull, SimpleString,
+    cmd::{CommandError, Get},
+    RespArray, RespFrame, RespNull,
 };
 
-use super::{extract_args, validate_command, CommandError, Set, RESP_OK};
-
-impl CommandExecutor for Ping {
-    fn execute(self, _backend: &Backend) -> RespFrame {
-        RespFrame::SimpleString(SimpleString::new("PONG"))
-    }
-}
-
 impl CommandExecutor for Get {
-    fn execute(self, backend: &Backend) -> RespFrame {
+    fn execute(self, backend: &crate::Backend) -> RespFrame {
         match backend.get(&self.key) {
             Some(value) => value,
             None => RespFrame::Null(RespNull),

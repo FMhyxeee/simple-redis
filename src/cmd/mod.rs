@@ -1,12 +1,12 @@
 mod hmap;
 mod map;
 
+use crate::{Backend, RespArray, RespError, RespFrame, SimpleString};
 use enum_dispatch::enum_dispatch;
 use lazy_static::lazy_static;
 use thiserror::Error;
 
-use crate::{Backend, RespArray, RespFrame, SimpleString};
-
+// you could also use once_cell instead of lazy_static
 lazy_static! {
     static ref RESP_OK: RespFrame = SimpleString::new("OK").into();
 }
@@ -19,7 +19,7 @@ pub enum CommandError {
     InvalidArgument(String),
 
     #[error("{0}")]
-    RespError(#[from] crate::RespError),
+    RespError(#[from] RespError),
     #[error("Utf8 error: {0}")]
     Utf8Error(#[from] std::string::FromUtf8Error),
 }
@@ -32,7 +32,6 @@ pub trait CommandExecutor {
 #[enum_dispatch(CommandExecutor)]
 #[derive(Debug)]
 pub enum Command {
-    Ping(Ping),
     Get(Get),
     Set(Set),
     HGet(HGet),
@@ -42,9 +41,6 @@ pub enum Command {
     // unrecognized command
     Unrecognized(Unrecognized),
 }
-
-#[derive(Debug)]
-pub struct Ping;
 
 #[derive(Debug)]
 pub struct Get {
@@ -73,6 +69,7 @@ pub struct HSet {
 #[derive(Debug)]
 pub struct HGetAll {
     key: String,
+    sort: bool,
 }
 
 #[derive(Debug)]
