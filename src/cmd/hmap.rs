@@ -1,11 +1,11 @@
-use crate::{RespArray, RespFrame, RespMap};
+use crate::{Backend, RespArray, RespFrame, RespMap};
 
 use super::{
     extract_args, validate_command, CommandError, CommandExecutor, HGet, HGetAll, HSet, RESP_OK,
 };
 
 impl CommandExecutor for HGet {
-    fn execute(self, backend: &crate::Backend) -> RespFrame {
+    fn execute(self, backend: &Backend) -> RespFrame {
         match backend.hget(&self.key, &self.field) {
             Some(value) => value,
             None => RespFrame::Null(crate::RespNull),
@@ -14,7 +14,7 @@ impl CommandExecutor for HGet {
 }
 
 impl CommandExecutor for HGetAll {
-    fn execute(self, backend: &crate::Backend) -> RespFrame {
+    fn execute(self, backend: &Backend) -> RespFrame {
         let hmap = backend.hmap.get(&self.key);
 
         match hmap {
@@ -32,7 +32,7 @@ impl CommandExecutor for HGetAll {
 }
 
 impl CommandExecutor for HSet {
-    fn execute(self, backend: &crate::Backend) -> RespFrame {
+    fn execute(self, backend: &Backend) -> RespFrame {
         backend.hset(self.key, self.field, self.value);
         RESP_OK.clone()
     }
