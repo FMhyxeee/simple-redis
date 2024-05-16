@@ -82,8 +82,9 @@ impl DerefMut for RespMap {
 
 #[cfg(test)]
 mod tests {
+    use crate::RespBulkString;
+
     use super::*;
-    use crate::BulkString;
     use anyhow::Result;
 
     #[test]
@@ -91,7 +92,7 @@ mod tests {
         let mut map = RespMap::new();
         map.insert(
             "hello".to_string(),
-            BulkString::new("world".to_string()).into(),
+            RespBulkString::new("world".to_string()).into(),
         );
         map.insert("foo".to_string(), (-123456.789).into());
 
@@ -111,9 +112,12 @@ mod tests {
         let mut map = RespMap::new();
         map.insert(
             "hello".to_string(),
-            BulkString::new(b"world".to_vec()).into(),
+            RespBulkString::new(b"world".to_vec()).into(),
         );
-        map.insert("foo".to_string(), BulkString::new(b"bar".to_vec()).into());
+        map.insert(
+            "foo".to_string(),
+            RespBulkString::new(b"bar".to_vec()).into(),
+        );
         assert_eq!(frame, map);
 
         Ok(())

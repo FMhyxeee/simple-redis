@@ -66,14 +66,14 @@ impl Deref for RespSet {
 mod tests {
 
     use super::*;
-    use crate::{BulkString, RespArray};
+    use crate::{RespArray, RespBulkString};
     use anyhow::Result;
 
     #[test]
     fn test_set_encode() {
         let frame: RespFrame = RespSet::new([
             RespArray::new([1234.into(), true.into()]).into(),
-            BulkString::new("world".to_string()).into(),
+            RespBulkString::new("world".to_string()).into(),
         ])
         .into();
         assert_eq!(
@@ -91,8 +91,8 @@ mod tests {
         assert_eq!(
             frame,
             RespSet::new(vec![
-                BulkString::new(b"set".to_vec()).into(),
-                BulkString::new(b"hello".to_vec()).into()
+                RespBulkString::new(b"set".to_vec()).into(),
+                RespBulkString::new(b"hello".to_vec()).into()
             ])
         );
 

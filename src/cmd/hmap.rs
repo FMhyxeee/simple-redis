@@ -1,5 +1,5 @@
 use super::{extract_args, validate_command, CommandExecutor, HGet, HGetAll, HSet, RESP_OK};
-use crate::{cmd::CommandError, BulkString, RespArray, RespFrame};
+use crate::{cmd::CommandError, RespArray, RespBulkString, RespFrame};
 
 impl CommandExecutor for HGet {
     fn execute(self, backend: &crate::Backend) -> RespFrame {
@@ -26,7 +26,7 @@ impl CommandExecutor for HGetAll {
                 }
                 let ret = data
                     .into_iter()
-                    .flat_map(|(k, v)| vec![BulkString::from(k).into(), v])
+                    .flat_map(|(k, v)| vec![RespBulkString::from(k).into(), v])
                     .collect::<Vec<RespFrame>>();
 
                 RespArray::new(ret).into()
@@ -50,7 +50,10 @@ impl TryFrom<RespArray> for HGet {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next()) {
-            (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field))) => Ok(HGet {
+            (
+                Some(RespFrame::BulkString(RespBulkString::BulkString(key))),
+                Some(RespFrame::BulkString(RespBulkString::BulkString(field))),
+            ) => Ok(HGet {
                 key: String::from_utf8(key.0)?,
                 field: String::from_utf8(field.0)?,
             }),
@@ -68,7 +71,7 @@ impl TryFrom<RespArray> for HGetAll {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match args.next() {
-            Some(RespFrame::BulkString(key)) => Ok(HGetAll {
+            Some(RespFrame::BulkString(RespBulkString::BulkString(key))) => Ok(HGetAll {
                 key: String::from_utf8(key.0)?,
                 sort: false,
             }),
@@ -84,13 +87,15 @@ impl TryFrom<RespArray> for HSet {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next(), args.next()) {
-            (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field)), Some(value)) => {
-                Ok(HSet {
-                    key: String::from_utf8(key.0)?,
-                    field: String::from_utf8(field.0)?,
-                    value,
-                })
-            }
+            (
+                Some(RespFrame::BulkString(RespBulkString::BulkString(key))),
+                Some(RespFrame::BulkString(RespBulkString::BulkString(field))),
+                Some(value),
+            ) => Ok(HSet {
+                key: String::from_utf8(key.0)?,
+                field: String::from_utf8(field.0)?,
+                value,
+            }),
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key, field or value".to_string(),
             )),
@@ -180,10 +185,10 @@ mod tests {
         let result = cmd.execute(&backend);
 
         let expected = RespArray::new([
-            BulkString::from("hello").into(),
-            BulkString::from("world").into(),
-            BulkString::from("hello1").into(),
-            BulkString::from("world1").into(),
+            RespBulkString::from("hello").into(),
+            RespBulkString::from("world").into(),
+            RespBulkString::from("hello1").into(),
+            RespBulkString::from("world1").into(),
         ]);
         assert_eq!(result, expected.into());
         Ok(())

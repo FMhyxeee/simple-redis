@@ -1,9 +1,11 @@
 use crate::{
-    BulkString, RespArray, RespDecode, RespError, RespMap, RespNull, RespNullArray,
-    RespNullBulkString, RespSet, SimpleError, SimpleString,
+    NullBulkString, RespArray, RespDecode, RespError, RespMap, RespNull, RespNullArray, RespSet,
+    SimpleError, SimpleString,
 };
 use bytes::BytesMut;
 use enum_dispatch::enum_dispatch;
+
+use super::bulk_string::{BulkString, RespBulkString};
 
 #[enum_dispatch(RespEncode)]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -11,8 +13,7 @@ pub enum RespFrame {
     SimpleString(SimpleString),
     Error(SimpleError),
     Integer(i64),
-    BulkString(BulkString),
-    NullBulkString(RespNullBulkString),
+    BulkString(RespBulkString),
     Array(RespArray),
     NullArray(RespNullArray),
     Null(RespNull),
@@ -41,12 +42,12 @@ impl RespDecode for RespFrame {
             }
             Some(b'$') => {
                 // try null bulk string first
-                match RespNullBulkString::decode(buf) {
-                    Ok(frame) => Ok(frame.into()),
+                match NullBulkString::decode(buf) {
+                    Ok(frame) => Ok(RespFrame::BulkString(frame.into())),
                     Err(RespError::NotComplete) => Err(RespError::NotComplete),
                     Err(_) => {
                         let frame = BulkString::decode(buf)?;
-                        Ok(frame.into())
+                        Ok(RespFrame::BulkString(frame.into()))
                     }
                 }
             }
@@ -115,13 +116,13 @@ impl From<&str> for RespFrame {
 
 impl From<&[u8]> for RespFrame {
     fn from(s: &[u8]) -> Self {
-        BulkString(s.to_vec()).into()
+        RespBulkString::new(s.to_vec()).into()
     }
 }
 
 impl<const N: usize> From<&[u8; N]> for RespFrame {
     fn from(s: &[u8; N]) -> Self {
-        BulkString(s.to_vec()).into()
+        RespBulkString::new(s.to_vec()).into()
     }
 }
 

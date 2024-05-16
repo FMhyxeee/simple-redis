@@ -1,7 +1,7 @@
 mod hmap;
 mod map;
 
-use crate::{Backend, RespArray, RespError, RespFrame, SimpleString};
+use crate::{Backend, RespArray, RespBulkString, RespError, RespFrame, SimpleString};
 use enum_dispatch::enum_dispatch;
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -91,14 +91,16 @@ impl TryFrom<RespArray> for Command {
     type Error = CommandError;
     fn try_from(v: RespArray) -> Result<Self, Self::Error> {
         match v.first() {
-            Some(RespFrame::BulkString(ref cmd)) => match cmd.as_ref() {
-                b"get" => Ok(Get::try_from(v)?.into()),
-                b"set" => Ok(Set::try_from(v)?.into()),
-                b"hget" => Ok(HGet::try_from(v)?.into()),
-                b"hset" => Ok(HSet::try_from(v)?.into()),
-                b"hgetall" => Ok(HGetAll::try_from(v)?.into()),
-                _ => Ok(Unrecognized.into()),
-            },
+            Some(RespFrame::BulkString(RespBulkString::BulkString(ref cmd))) => {
+                match cmd.as_ref() {
+                    b"get" => Ok(Get::try_from(v)?.into()),
+                    b"set" => Ok(Set::try_from(v)?.into()),
+                    b"hget" => Ok(HGet::try_from(v)?.into()),
+                    b"hset" => Ok(HSet::try_from(v)?.into()),
+                    b"hgetall" => Ok(HGetAll::try_from(v)?.into()),
+                    _ => Ok(Unrecognized.into()),
+                }
+            }
             _ => Err(CommandError::InvalidCommand(
                 "Command must have a BulkString as the first argument".to_string(),
             )),
@@ -127,7 +129,7 @@ fn validate_command(
 
     for (i, name) in names.iter().enumerate() {
         match value[i] {
-            RespFrame::BulkString(ref cmd) => {
+            RespFrame::BulkString(RespBulkString::BulkString(ref cmd)) => {
                 if cmd.as_ref().to_ascii_lowercase() != name.as_bytes() {
                     return Err(CommandError::InvalidCommand(format!(
                         "Invalid command: expected {}, got {}",

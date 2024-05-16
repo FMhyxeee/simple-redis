@@ -88,16 +88,17 @@ impl Deref for RespArray {
 
 #[cfg(test)]
 mod tests {
+    use crate::RespBulkString;
+
     use super::*;
-    use crate::BulkString;
     use anyhow::Result;
 
     #[test]
     fn test_array_encode() {
         let frame: RespFrame = RespArray::new(vec![
-            BulkString::new("set".to_string()).into(),
-            BulkString::new("hello".to_string()).into(),
-            BulkString::new("world".to_string()).into(),
+            RespBulkString::new("set".to_string()).into(),
+            RespBulkString::new("hello".to_string()).into(),
+            RespBulkString::new("world".to_string()).into(),
         ])
         .into();
         assert_eq!(
