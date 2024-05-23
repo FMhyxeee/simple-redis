@@ -1,7 +1,6 @@
-use super::{extract_args, validate_command, CommandExecutor, Set, RESP_OK};
+use super::{extract_args, validate_command, CommandExecutor, Echo, Set, RESP_OK};
 use crate::{
-    cmd::{CommandError, Get},
-    RespArray, RespFrame, RespNull,
+    cmd::{CommandError, Get}, BulkString, RespArray, RespFrame, RespNull
 };
 
 impl CommandExecutor for Get {
@@ -19,6 +18,13 @@ impl CommandExecutor for Set {
         RESP_OK.clone()
     }
 }
+
+impl CommandExecutor for Echo {
+    fn execute(self, _backend: &crate::Backend) -> RespFrame {
+        RespFrame::BulkString(BulkString::new(self.message))
+    }
+}
+
 
 impl TryFrom<RespArray> for Get {
     type Error = CommandError;
@@ -49,6 +55,22 @@ impl TryFrom<RespArray> for Set {
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key or value".to_string(),
             )),
+        }
+    }
+}
+
+
+impl TryFrom<RespArray> for Echo {
+    type Error = CommandError;
+    fn try_from(value: RespArray) -> Result<Self, Self::Error> {
+        validate_command(&value, &["echo"], 1)?;
+
+        let mut args = extract_args(value, 1)?.into_iter();
+        match args.next() {
+            Some(RespFrame::BulkString(msg)) => Ok(Echo {
+                message: String::from_utf8(msg.0)?,
+            }),
+            _ => Err(CommandError::InvalidArgument("Invalid key".to_string())),
         }
     }
 }
@@ -103,6 +125,16 @@ mod tests {
         let result = cmd.execute(&backend);
         assert_eq!(result, RespFrame::BulkString(b"world".into()));
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_echo() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"*2\r\n$4\r\necho\r\n$12\r\nHello World!\r\n");
+        let frame = RespArray::decode(&mut buf)?;
+        let result: Echo = frame.try_into()?;
+        assert_eq!(result.message, "Hello World!");
         Ok(())
     }
 }
