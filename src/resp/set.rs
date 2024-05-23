@@ -26,7 +26,7 @@ impl RespDecode for RespSet {
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
         let (end, len) = parse_length(buf, Self::PREFIX)?;
 
-        let total_len = calc_total_length(buf, end, len, Self::PREFIX)?;
+        let total_len = calc_total_length(buf, end, len as usize, Self::PREFIX)?;
 
         if buf.len() < total_len {
             return Err(RespError::NotComplete);
@@ -44,7 +44,7 @@ impl RespDecode for RespSet {
 
     fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
         let (end, len) = parse_length(buf, Self::PREFIX)?;
-        calc_total_length(buf, end, len, Self::PREFIX)
+        calc_total_length(buf, end, len as usize, Self::PREFIX)
     }
 }
 
@@ -66,14 +66,14 @@ impl Deref for RespSet {
 mod tests {
 
     use super::*;
-    use crate::{RespArray, RespBulkString};
+    use crate::{BulkString, RespArray};
     use anyhow::Result;
 
     #[test]
     fn test_set_encode() {
         let frame: RespFrame = RespSet::new([
             RespArray::new([1234.into(), true.into()]).into(),
-            RespBulkString::new("world".to_string()).into(),
+            BulkString::new("world".to_string()).into(),
         ])
         .into();
         assert_eq!(
@@ -91,8 +91,8 @@ mod tests {
         assert_eq!(
             frame,
             RespSet::new(vec![
-                RespBulkString::new(b"set".to_vec()).into(),
-                RespBulkString::new(b"hello".to_vec()).into()
+                BulkString::new(b"set".to_vec()).into(),
+                BulkString::new(b"hello".to_vec()).into()
             ])
         );
 

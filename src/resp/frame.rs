@@ -1,11 +1,9 @@
 use crate::{
-    NullBulkString, RespArray, RespDecode, RespError, RespMap, RespNull, RespNullArray, RespSet,
-    SimpleError, SimpleString,
+    BulkString, RespArray, RespDecode, RespError, RespMap, RespNull, RespSet, SimpleError,
+    SimpleString,
 };
 use bytes::BytesMut;
 use enum_dispatch::enum_dispatch;
-
-use super::bulk_string::{BulkString, RespBulkString};
 
 #[enum_dispatch(RespEncode)]
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -13,9 +11,8 @@ pub enum RespFrame {
     SimpleString(SimpleString),
     Error(SimpleError),
     Integer(i64),
-    BulkString(RespBulkString),
+    BulkString(BulkString),
     Array(RespArray),
-    NullArray(RespNullArray),
     Null(RespNull),
     Boolean(bool),
     Double(f64),
@@ -41,27 +38,10 @@ impl RespDecode for RespFrame {
                 Ok(frame.into())
             }
             Some(b'$') => {
-                // try null bulk string first
-                match NullBulkString::decode(buf) {
-                    Ok(frame) => Ok(RespFrame::BulkString(frame.into())),
-                    Err(RespError::NotComplete) => Err(RespError::NotComplete),
-                    Err(_) => {
-                        let frame = BulkString::decode(buf)?;
-                        Ok(RespFrame::BulkString(frame.into()))
-                    }
-                }
+                let frame = BulkString::decode(buf)?;
+                Ok(frame.into())
             }
-            Some(b'*') => {
-                // try null array first
-                match RespNullArray::decode(buf) {
-                    Ok(frame) => Ok(frame.into()),
-                    Err(RespError::NotComplete) => Err(RespError::NotComplete),
-                    Err(_) => {
-                        let frame = RespArray::decode(buf)?;
-                        Ok(frame.into())
-                    }
-                }
-            }
+            Some(b'*') => RespArray::decode(buf).map(|frame| frame.into()),
             Some(b'_') => {
                 let frame = RespNull::decode(buf)?;
                 Ok(frame.into())
@@ -116,13 +96,13 @@ impl From<&str> for RespFrame {
 
 impl From<&[u8]> for RespFrame {
     fn from(s: &[u8]) -> Self {
-        RespBulkString::new(s.to_vec()).into()
+        BulkString::new(s.to_vec()).into()
     }
 }
 
 impl<const N: usize> From<&[u8; N]> for RespFrame {
     fn from(s: &[u8; N]) -> Self {
-        RespBulkString::new(s.to_vec()).into()
+        BulkString::new(s.to_vec()).into()
     }
 }
 

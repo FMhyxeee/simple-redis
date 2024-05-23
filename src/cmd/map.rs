@@ -1,7 +1,7 @@
 use super::{extract_args, validate_command, CommandExecutor, Set, RESP_OK};
 use crate::{
     cmd::{CommandError, Get},
-    RespArray, RespBulkString, RespFrame, RespNull,
+    RespArray, RespFrame, RespNull,
 };
 
 impl CommandExecutor for Get {
@@ -27,7 +27,7 @@ impl TryFrom<RespArray> for Get {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match args.next() {
-            Some(RespFrame::BulkString(RespBulkString::BulkString(key))) => Ok(Get {
+            Some(RespFrame::BulkString(key)) => Ok(Get {
                 key: String::from_utf8(key.0)?,
             }),
             _ => Err(CommandError::InvalidArgument("Invalid key".to_string())),
@@ -42,12 +42,10 @@ impl TryFrom<RespArray> for Set {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next()) {
-            (Some(RespFrame::BulkString(RespBulkString::BulkString(key))), Some(value)) => {
-                Ok(Set {
-                    key: String::from_utf8(key.0)?,
-                    value,
-                })
-            }
+            (Some(RespFrame::BulkString(key)), Some(value)) => Ok(Set {
+                key: String::from_utf8(key.0)?,
+                value,
+            }),
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key or value".to_string(),
             )),

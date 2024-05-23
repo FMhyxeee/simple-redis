@@ -30,7 +30,7 @@ impl RespDecode for RespMap {
     const PREFIX: &'static str = "%";
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
         let (end, len) = parse_length(buf, Self::PREFIX)?;
-        let total_len = calc_total_length(buf, end, len, Self::PREFIX)?;
+        let total_len = calc_total_length(buf, end, len as usize, Self::PREFIX)?;
 
         if buf.len() < total_len {
             return Err(RespError::NotComplete);
@@ -50,7 +50,7 @@ impl RespDecode for RespMap {
 
     fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
         let (end, len) = parse_length(buf, Self::PREFIX)?;
-        calc_total_length(buf, end, len, Self::PREFIX)
+        calc_total_length(buf, end, len as usize, Self::PREFIX)
     }
 }
 
@@ -82,7 +82,7 @@ impl DerefMut for RespMap {
 
 #[cfg(test)]
 mod tests {
-    use crate::RespBulkString;
+    use crate::BulkString;
 
     use super::*;
     use anyhow::Result;
@@ -92,7 +92,7 @@ mod tests {
         let mut map = RespMap::new();
         map.insert(
             "hello".to_string(),
-            RespBulkString::new("world".to_string()).into(),
+            BulkString::new("world".to_string()).into(),
         );
         map.insert("foo".to_string(), (-123456.789).into());
 
@@ -112,12 +112,9 @@ mod tests {
         let mut map = RespMap::new();
         map.insert(
             "hello".to_string(),
-            RespBulkString::new(b"world".to_vec()).into(),
+            BulkString::new(b"world".to_vec()).into(),
         );
-        map.insert(
-            "foo".to_string(),
-            RespBulkString::new(b"bar".to_vec()).into(),
-        );
+        map.insert("foo".to_string(), BulkString::new(b"bar".to_vec()).into());
         assert_eq!(frame, map);
 
         Ok(())
